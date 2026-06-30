@@ -243,42 +243,6 @@ function useFirebaseInventory(userId) {
   return { data, loading };
 }
 
-function useFirebaseProjects(userId) {
-  const [projects, setProjects] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const projectsRef = ref(database, `users/${userId}/projects`);
-    let unsubscribe;
-
-    const setupListener = async () => {
-      try {
-        unsubscribe = onValue(projectsRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const firebaseProjects = JSON.parse(JSON.stringify(snapshot.val()));
-            setProjects(Array.isArray(firebaseProjects) ? firebaseProjects : Object.values(firebaseProjects || {}));
-          } else {
-            setProjects([]);
-          }
-          setLoading(false);
-        });
-      } catch (error) {
-        console.error("Error Firebase:", error);
-        setProjects([]);
-        setLoading(false);
-      }
-    };
-
-    setupListener();
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [userId]);
-
-  return { projects, loading };
-}
-
 // Sincronizar proyectos con Firebase
 function useFirebaseProjects(userId) {
   const [projects, setProjects] = useState(null);
