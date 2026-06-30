@@ -300,6 +300,90 @@ function clone(d) {
   return JSON.parse(JSON.stringify(d));
 }
 
+function csvEscape(value) {
+  const textValue = String(value ?? "");
+  return /[",\n]/.test(textValue) ? `"${textValue.replaceAll('"', '""')}"` : textValue;
+}
+
+function dataToCsv(data) {
+  const rows = [["categoria", "subcategoria", "part", "qty", "spec"]];
+  flatten(data).forEach(item => {
+    rows.push([item.cat, item.sub, item.part, item.qty, item.spec || ""]);
+  });
+  return rows.map(row => row.map(csvEscape).join(",")).join("\n");
+}
+
+function parseCsvLine(line) {
+  const values = [];
+  let current = "";
+  let quoted = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      i += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      values.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current.trim());
+  return values;
+}
+
+function csvToData(csvText, baseData = {}) {
+  const lines = csvText.replace(/^\uFEFF/, "").split(/\r?\n/).filter(line => line.trim());
+  if (lines.length < 2) throw new Error("CSV vacío");
+
+  const headers = parseCsvLine(lines[0]).map(header => header.toLowerCase());
+  const findIndex = names => names.map(name => headers.indexOf(name)).find(index => index >= 0);
+  const catIndex = findIndex(["categoria", "category", "cat"]);
+  const subIndex = findIndex(["subcategoria", "subcategory", "sub"]);
+  const partIndex = findIndex(["part", "parte", "part number", "componente"]);
+  const qtyIndex = findIndex(["qty", "cantidad", "unidades", "stock"]);
+  const specIndex = findIndex(["spec", "especificacion", "especificación", "descripcion", "descripción"]);
+
+  if ([catIndex, subIndex, partIndex, qtyIndex].some(index => index === undefined)) {
+    throw new Error("El CSV necesita columnas categoria, subcategoria, part y qty");
+  }
+
+  const nextData = clone(baseData || {});
+
+  lines.slice(1).forEach(line => {
+    const row = parseCsvLine(line);
+    const cat = row[catIndex] || "Otros";
+    const sub = row[subIndex] || "Generales";
+    const part = row[partIndex];
+    const qty = Math.max(0, Number.parseInt(row[qtyIndex] || "0", 10) || 0);
+    const spec = specIndex === undefined ? "" : row[specIndex] || "";
+
+    if (!part) return;
+
+    if (!nextData[cat]) nextData[cat] = { ...catMeta(cat), subcats: {} };
+    if (!nextData[cat].subcats) nextData[cat].subcats = {};
+    if (!nextData[cat].subcats[sub]) nextData[cat].subcats[sub] = { items: [] };
+
+    const items = nextData[cat].subcats[sub].items || [];
+    const existingIndex = items.findIndex(item => item.part.toLowerCase() === part.toLowerCase());
+    const item = { part, qty, spec };
+
+    if (existingIndex >= 0) items[existingIndex] = item;
+    else items.push(item);
+
+    nextData[cat].subcats[sub].items = items;
+  });
+
+  return nextData;
+}
+
 // ─── CATEGORY PANEL ───────────────────────────────────────────────────────────
 function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
   const [openSub, setOpenSub] = useState(null);
@@ -456,6 +540,7 @@ export default function App() {
   const [expanded, setExpanded] = useState({});
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
+  const importInputRef = useRef(null);
 
   function showToast(msg, type = "ok") {
     setToast({ msg, type });
@@ -471,6 +556,41 @@ export default function App() {
 
   function updateProjects(newProjects) {
     saveProjectsToFirebase(userId, newProjects);
+  }
+
+  function exportCsv() {
+    const csv = dataToCsv(data);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `electroinventory-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("CSV exportado");
+  }
+
+  function importCsv(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const importedData = csvToData(String(reader.result || ""), data);
+        saveInventoryToFirebase(userId, importedData);
+        setExpanded(Object.fromEntries(Object.keys(importedData).map(key => [key, true])));
+        showToast("CSV importado a Firebase");
+      } catch (error) {
+        console.error("Error importando CSV:", error);
+        showToast(error.message || "No se pudo importar el CSV", "warn");
+      } finally {
+        event.target.value = "";
+      }
+    };
+    reader.readAsText(file);
   }
 
   const inventoryData = data || {};
@@ -532,11 +652,18 @@ export default function App() {
 
         {tab === "inventory" && (
           <div>
-            <div style={{ position: "relative", marginBottom: "1.25rem" }}>
-              <span style={{ position: "absolute", left: "0.875rem", top: "50%", transform: "translateY(-50%)", color: muted, fontSize: "0.8rem", pointerEvents: "none" }}>⌕</span>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por part number, especificación, categoría…"
-                style={{ ...inp, paddingLeft: "2.25rem", borderRadius: 9, fontSize: "0.85rem", padding: "0.7rem 0.875rem 0.7rem 2.25rem" }} />
-              {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: "0.875rem", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: muted, cursor: "pointer", fontFamily: mono, fontSize: "1rem" }}>×</button>}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "0.75rem", alignItems: "center", marginBottom: "1.25rem" }}>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: "0.875rem", top: "50%", transform: "translateY(-50%)", color: muted, fontSize: "0.8rem", pointerEvents: "none" }}>⌕</span>
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por part number, especificación, categoría…"
+                  style={{ ...inp, paddingLeft: "2.25rem", borderRadius: 9, fontSize: "0.85rem", padding: "0.7rem 0.875rem 0.7rem 2.25rem" }} />
+                {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: "0.875rem", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: muted, cursor: "pointer", fontFamily: mono, fontSize: "1rem" }}>×</button>}
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <input ref={importInputRef} onChange={importCsv} type="file" accept=".csv,text/csv" style={{ display: "none" }} />
+                <button onClick={() => importInputRef.current?.click()} className="hbtn" style={{ background: "#0f2749", border: "1px solid #1d4ed8", borderRadius: 9, padding: "0.65rem 0.9rem", color: "#93c5fd", cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap" }}>⇧ Importar CSV</button>
+                <button onClick={exportCsv} className="hbtn" style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 9, padding: "0.65rem 0.9rem", color: "#86efac", cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap" }}>⇩ Exportar CSV</button>
+              </div>
             </div>
             {search.trim() ? (
               <div>
