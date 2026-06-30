@@ -473,15 +473,8 @@ export default function App() {
     saveProjectsToFirebase(userId, newProjects);
   }
 
-  if (dataLoading || projectsLoading) {
-    return <div style={{ minHeight: "100vh", background: bg, color: text, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: mono }}>Cargando desde Firebase...</div>;
-  }
-
-  if (!data) {
-    return <div style={{ minHeight: "100vh", background: bg, color: "#f87171", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: mono }}>Error cargando datos. Intenta recargando.</div>;
-  }
-
-  const allItems = useMemo(() => flatten(data), [data]);
+  const inventoryData = data || {};
+  const allItems = useMemo(() => flatten(inventoryData), [inventoryData]);
   const totalRefs = allItems.length;
   const totalQty = allItems.reduce((s, i) => s + i.qty, 0);
   const totalLow = allItems.filter(i => i.qty <= 2).length;
@@ -497,6 +490,14 @@ export default function App() {
       i.sub.toLowerCase().includes(q)
     );
   }, [allItems, search]);
+
+  if (dataLoading || projectsLoading) {
+    return <div style={{ minHeight: "100vh", background: bg, color: text, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: mono }}>Cargando desde Firebase...</div>;
+  }
+
+  if (!data) {
+    return <div style={{ minHeight: "100vh", background: bg, color: "#f87171", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: mono }}>Error cargando datos. Intenta recargando.</div>;
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: bg, color: text, fontFamily: mono }}>
