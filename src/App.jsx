@@ -310,7 +310,7 @@ function dataToCsv(data) {
   flatten(data).forEach(item => {
     rows.push([item.cat, item.sub, item.part, item.qty, item.spec || ""]);
   });
-  return rows.map(row => row.map(csvEscape).join(",")).join("\n");
+  return `\uFEFF${rows.map(row => row.map(csvEscape).join(",")).join("\n")}`;
 }
 
 function parseCsvLine(line) {
@@ -530,6 +530,176 @@ function SearchView({ results, onQtyChange }) {
   );
 }
 
+const STATUS_META = {
+  "Activo": { color: "#4ade80", bg: "#052e16", border: "#166534" },
+  "En pausa": { color: "#fbbf24", bg: "#451a03", border: "#92400e" },
+  "Completado": { color: "#60a5fa", bg: "#0f2749", border: "#1d4ed8" },
+};
+
+function ProjectsView({ projects, invData, onCreateProject, onUpdateProject, onAddComponent, onRemoveComponent, onDeleteProject }) {
+  const [openProjectId, setOpenProjectId] = useState(null);
+  const [showNew, setShowNew] = useState(false);
+  const [componentSearch, setComponentSearch] = useState("");
+  const [newProject, setNewProject] = useState({ name: "", desc: "" });
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const openProject = projects.find(project => project.id === openProjectId) || null;
+  const allItems = useMemo(() => flatten(invData), [invData]);
+  const componentResults = useMemo(() => {
+    if (!componentSearch.trim()) return [];
+    const query = componentSearch.toLowerCase();
+    return allItems.filter(item => item.qty > 0 && (
+      item.part.toLowerCase().includes(query) ||
+      (item.spec || "").toLowerCase().includes(query) ||
+      item.cat.toLowerCase().includes(query) ||
+      item.sub.toLowerCase().includes(query)
+    )).slice(0, 8);
+  }, [allItems, componentSearch]);
+
+  function createProject() {
+    const name = newProject.name.trim();
+    if (!name) return;
+    onCreateProject({ name, desc: newProject.desc.trim() });
+    setNewProject({ name: "", desc: "" });
+    setShowNew(false);
+  }
+
+  function projectUnits(project) {
+    return (project.components || []).reduce((sum, component) => sum + Number(component.qtyUsed || 0), 0);
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", gap: "1rem" }}>
+        <div>
+          <div style={{ color: text, fontFamily: mono, fontWeight: 700, fontSize: "0.95rem" }}>Proyectos</div>
+          <div style={{ color: muted, fontSize: "0.65rem", fontFamily: mono }}>{projects.length} proyecto{projects.length !== 1 ? "s" : ""} · conectados a Firebase</div>
+        </div>
+        <button onClick={() => setShowNew(true)} className="hbtn" style={{ padding: "0.55rem 1rem", background: "#15803d", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>+ Nuevo proyecto</button>
+      </div>
+
+      {projects.length === 0 ? (
+        <div style={{ background: surf, border: `1px solid ${bord}`, borderRadius: 10, padding: "4rem", textAlign: "center" }}>
+          <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>⬡</div>
+          <div style={{ color: text, fontFamily: mono, fontWeight: 600, marginBottom: "0.4rem" }}>Sin proyectos aún</div>
+          <div style={{ color: muted, fontSize: "0.75rem", fontFamily: mono }}>Crea un proyecto y asigna componentes del inventario</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: "0.75rem" }}>
+          {projects.map(project => {
+            const statusMeta = STATUS_META[project.status] || STATUS_META.Activo;
+            return (
+              <div key={project.id} onClick={() => setOpenProjectId(project.id)} className="hrow" style={{ background: surf, border: `1px solid ${bord}`, borderRadius: 10, padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "1rem", cursor: "pointer" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.3rem", flexWrap: "wrap" }}>
+                    <span style={{ color: text, fontFamily: mono, fontWeight: 700, fontSize: "0.9rem" }}>{project.name}</span>
+                    <span style={{ background: statusMeta.bg, border: `1px solid ${statusMeta.border}`, color: statusMeta.color, borderRadius: 20, padding: "0.1rem 0.55rem", fontSize: "0.65rem", fontFamily: mono, fontWeight: 700 }}>{project.status || "Activo"}</span>
+                  </div>
+                  <div style={{ color: muted, fontSize: "0.7rem", fontFamily: mono }}>{(project.components || []).length} refs · {projectUnits(project)} uds{project.desc ? ` · ${project.desc}` : ""}</div>
+                </div>
+                <span style={{ color: muted, fontSize: "0.8rem", fontFamily: mono }}>▶</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showNew && (
+        <Modal title="// NUEVO PROYECTO" onClose={() => setShowNew(false)} width={460}>
+          <div style={{ display: "grid", gap: "0.875rem" }}>
+            <div><label style={lbl}>Nombre *</label><input style={inp} value={newProject.name} onChange={event => setNewProject(project => ({ ...project, name: event.target.value }))} placeholder="ej: Sistema mínimo" autoFocus /></div>
+            <div><label style={lbl}>Descripción</label><textarea style={{ ...inp, resize: "vertical", minHeight: 70 }} value={newProject.desc} onChange={event => setNewProject(project => ({ ...project, desc: event.target.value }))} placeholder="opcional" /></div>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
+            <button onClick={() => setShowNew(false)} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cancelar</button>
+            <button onClick={createProject} className="hbtn" style={{ padding: "0.55rem 1.2rem", background: newProject.name.trim() ? "#15803d" : "#1e293b", border: "none", borderRadius: 7, color: "#fff", cursor: newProject.name.trim() ? "pointer" : "not-allowed", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>Crear proyecto</button>
+          </div>
+        </Modal>
+      )}
+
+      {openProject && (
+        <Modal title={`// ${openProject.name}`} onClose={() => { setOpenProjectId(null); setComponentSearch(""); }} width={780}>
+          <div style={{ display: "grid", gap: "1rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+              {Object.keys(STATUS_META).map(status => {
+                const statusMeta = STATUS_META[status];
+                const active = (openProject.status || "Activo") === status;
+                return <button key={status} onClick={() => onUpdateProject(openProject.id, { status })} className="hbtn" style={{ padding: "0.3rem 0.75rem", borderRadius: 20, border: `1px solid ${active ? statusMeta.border : bord2}`, background: active ? statusMeta.bg : "transparent", color: active ? statusMeta.color : muted, cursor: "pointer", fontFamily: mono, fontSize: "0.7rem", fontWeight: 700 }}>{status}</button>;
+              })}
+            </div>
+
+            <div style={{ background: "#0a111e", border: `1px solid ${bord}`, borderRadius: 8, padding: "0.8rem 1rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+              <div><div style={{ color: muted, fontSize: "0.6rem", letterSpacing: "0.1em", fontFamily: mono }}>REFERENCIAS</div><div style={{ color: "#60a5fa", fontWeight: 700, fontFamily: mono }}>{(openProject.components || []).length}</div></div>
+              <div><div style={{ color: muted, fontSize: "0.6rem", letterSpacing: "0.1em", fontFamily: mono }}>UNIDADES USADAS</div><div style={{ color: "#f87171", fontWeight: 700, fontFamily: mono }}>{projectUnits(openProject)}</div></div>
+              <div><div style={{ color: muted, fontSize: "0.6rem", letterSpacing: "0.1em", fontFamily: mono }}>ESTADO</div><div style={{ color: (STATUS_META[openProject.status] || STATUS_META.Activo).color, fontWeight: 700, fontFamily: mono }}>{openProject.status || "Activo"}</div></div>
+            </div>
+
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "0.6rem" }}>
+                <span style={{ color: muted, fontSize: "0.65rem", letterSpacing: "0.1em", fontFamily: mono }}>COMPONENTES</span>
+                <input value={componentSearch} onChange={event => setComponentSearch(event.target.value)} placeholder="Buscar para agregar…" style={{ ...inp, maxWidth: 280, padding: "0.45rem 0.65rem" }} />
+              </div>
+
+              {componentSearch.trim() && (
+                <div style={{ border: `1px solid ${bord}`, borderRadius: 8, overflow: "hidden", marginBottom: "0.8rem" }}>
+                  {componentResults.length === 0 && <div style={{ padding: "0.8rem", color: muted, fontFamily: mono, fontSize: "0.75rem" }}>Sin resultados con stock disponible</div>}
+                  {componentResults.map(item => (
+                    <button key={`${item.cat}-${item.sub}-${item.part}`} onClick={() => { onAddComponent(openProject.id, { ...item, qtyUsed: 1 }); setComponentSearch(""); }} className="hrow" style={{ width: "100%", padding: "0.65rem 0.85rem", border: "none", borderBottom: `1px solid ${bord}`, background: "transparent", color: text, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.75rem", textAlign: "left" }}>
+                      <span style={{ flex: 1, fontFamily: mono, fontSize: "0.78rem" }}>{item.part}<span style={{ color: muted }}> · {item.cat} › {item.sub}</span></span>
+                      <span style={{ color: "#4ade80", fontFamily: mono, fontSize: "0.7rem" }}>{item.qty} uds</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {(!openProject.components || openProject.components.length === 0) ? (
+                <div style={{ border: `1px solid ${bord}`, borderRadius: 8, padding: "2rem", textAlign: "center", color: muted, fontSize: "0.8rem", fontFamily: mono }}>Sin componentes asignados</div>
+              ) : (
+                <div style={{ border: `1px solid ${bord}`, borderRadius: 8, overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead><tr style={{ background: "#060d1a" }}>{["Part", "Categoría", "Spec", "Cant.", ""].map(header => <th key={header} style={{ padding: "0.45rem 0.875rem", textAlign: "left", color: muted, fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", borderBottom: `1px solid ${bord}`, fontFamily: mono }}>{header}</th>)}</tr></thead>
+                    <tbody>
+                      {openProject.components.map((component, index) => (
+                        <tr key={`${component.cat}-${component.sub}-${component.part}`} className="hrow" style={{ borderBottom: `1px solid ${bord}`, background: index % 2 === 0 ? "transparent" : "#080f1c" }}>
+                          <td style={{ padding: "0.55rem 0.875rem", color: text, fontFamily: mono, fontSize: "0.82rem", fontWeight: 600 }}>{component.part}</td>
+                          <td style={{ padding: "0.55rem 0.875rem" }}><Badge color={component.color || catMeta(component.cat).color}>{component.cat}</Badge></td>
+                          <td style={{ padding: "0.55rem 0.875rem", color: textDim, fontFamily: mono, fontSize: "0.72rem" }}>{component.spec || "—"}</td>
+                          <td style={{ padding: "0.55rem 0.875rem", color: "#f87171", fontFamily: mono, fontWeight: 700 }}>{component.qtyUsed}</td>
+                          <td style={{ padding: "0.55rem 0.75rem" }}><button onClick={() => onRemoveComponent(openProject.id, component)} className="hbtn" style={{ padding: "0.2rem 0.5rem", background: "#1c0a0a", border: "1px solid #7f1d1d", borderRadius: 5, color: "#f87171", cursor: "pointer", fontFamily: mono, fontSize: "0.65rem" }}>×</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "1.25rem", paddingTop: "1rem", borderTop: `1px solid ${bord}` }}>
+            <button onClick={() => { setOpenProjectId(null); setComponentSearch(""); }} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cerrar</button>
+            <button onClick={() => setDeleteConfirm(openProject.id)} className="hbtn" style={{ padding: "0.55rem 1rem", background: "#1c0a0a", border: "1px solid #7f1d1d", borderRadius: 7, color: "#f87171", cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>🗑 Eliminar proyecto</button>
+          </div>
+        </Modal>
+      )}
+
+      {deleteConfirm && (
+        <Modal title="// CONFIRMAR ELIMINACIÓN" onClose={() => setDeleteConfirm(null)} width={420}>
+          <div style={{ display: "grid", gap: "1rem" }}>
+            <div style={{ color: textDim, fontSize: "0.85rem", lineHeight: 1.6, fontFamily: mono }}>
+              ¿Estás seguro que deseas eliminar el proyecto <span style={{ color: "#f87171", fontWeight: 700 }}>"{projects.find(p => p.id === deleteConfirm)?.name}"</span>?
+            </div>
+            <div style={{ background: "#1c0a0a", border: "1px solid #7f1d1d", borderRadius: 8, padding: "0.75rem 1rem", color: "#fca5a5", fontSize: "0.75rem", fontFamily: mono }}>
+              ⚠ Los componentes del proyecto volverán al inventario
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem", justifyContent: "flex-end" }}>
+            <button onClick={() => setDeleteConfirm(null)} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cancelar</button>
+            <button onClick={() => { onDeleteProject(deleteConfirm); setDeleteConfirm(null); setOpenProjectId(null); }} className="hbtn" style={{ padding: "0.55rem 1.2rem", background: "#7f1d1d", border: "1px solid #b91c1c", borderRadius: 7, color: "#fca5a5", cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>Sí, eliminar</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const userId = "user_default"; // En futuro: usar autenticación real
@@ -540,6 +710,7 @@ export default function App() {
   const [expanded, setExpanded] = useState({});
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState(null);
+  const [csvPreview, setCsvPreview] = useState(null);
   const importInputRef = useRef(null);
 
   function showToast(msg, type = "ok") {
@@ -558,6 +729,79 @@ export default function App() {
     saveProjectsToFirebase(userId, newProjects);
   }
 
+  function createProject(project) {
+    const nextProjects = [
+      ...(projects || []),
+      { id: Date.now(), name: project.name, desc: project.desc || "", status: "Activo", components: [], createdAt: new Date().toLocaleDateString("es-MX") },
+    ];
+    updateProjects(nextProjects);
+    showToast("Proyecto creado");
+  }
+
+  function updateProject(projectId, patch) {
+    const nextProjects = (projects || []).map(project => project.id === projectId ? { ...project, ...patch } : project);
+    updateProjects(nextProjects);
+    showToast("Proyecto actualizado");
+  }
+
+  function addComponentToProject(projectId, component) {
+    const qtyUsed = Math.max(1, Number(component.qtyUsed || 1));
+    const newData = clone(data);
+    const inventoryItem = newData[component.cat]?.subcats?.[component.sub]?.items?.find(item => item.part === component.part);
+
+    if (!inventoryItem || inventoryItem.qty < qtyUsed) {
+      showToast("No hay stock suficiente", "warn");
+      return;
+    }
+
+    inventoryItem.qty = Math.max(0, inventoryItem.qty - qtyUsed);
+    const nextProjects = (projects || []).map(project => {
+      if (project.id !== projectId) return project;
+      const components = [...(project.components || [])];
+      const existing = components.find(item => item.cat === component.cat && item.sub === component.sub && item.part === component.part);
+      if (existing) existing.qtyUsed = Number(existing.qtyUsed || 0) + qtyUsed;
+      else components.push({ part: component.part, qty: component.qty, qtyUsed, spec: component.spec || "", notes: component.notes || "", cat: component.cat, sub: component.sub, color: component.color || catMeta(component.cat).color });
+      return { ...project, components };
+    });
+
+    saveInventoryToFirebase(userId, newData);
+    updateProjects(nextProjects);
+    showToast("Componente agregado y descontado");
+  }
+
+  function removeComponentFromProject(projectId, component) {
+    const qtyUsed = Math.max(1, Number(component.qtyUsed || 1));
+    const newData = clone(data);
+    const inventoryItem = newData[component.cat]?.subcats?.[component.sub]?.items?.find(item => item.part === component.part);
+    if (inventoryItem) inventoryItem.qty = Number(inventoryItem.qty || 0) + qtyUsed;
+
+    const nextProjects = (projects || []).map(project => {
+      if (project.id !== projectId) return project;
+      return { ...project, components: (project.components || []).filter(item => !(item.cat === component.cat && item.sub === component.sub && item.part === component.part)) };
+    });
+
+    saveInventoryToFirebase(userId, newData);
+    updateProjects(nextProjects);
+    showToast("Componente devuelto al inventario");
+  }
+
+  function deleteProject(projectId) {
+    const projectToDelete = projects.find(p => p.id === projectId);
+    if (!projectToDelete) return;
+
+    const newData = clone(data);
+    (projectToDelete.components || []).forEach(component => {
+      const qtyUsed = Math.max(1, Number(component.qtyUsed || 1));
+      const inventoryItem = newData[component.cat]?.subcats?.[component.sub]?.items?.find(item => item.part === component.part);
+      if (inventoryItem) inventoryItem.qty = Number(inventoryItem.qty || 0) + qtyUsed;
+    });
+
+    const nextProjects = (projects || []).filter(p => p.id !== projectId);
+    saveInventoryToFirebase(userId, newData);
+    updateProjects(nextProjects);
+    showToast("Proyecto eliminado");
+  }
+
   function exportCsv() {
     const csv = dataToCsv(data);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -565,11 +809,24 @@ export default function App() {
     const link = document.createElement("a");
     link.href = url;
     link.download = `electroinventory-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.rel = "noopener";
+    link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast("CSV exportado");
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setCsvPreview(csv);
+    showToast("CSV exportado; copia de respaldo lista");
+  }
+
+  async function copyCsvPreview() {
+    try {
+      await navigator.clipboard.writeText(csvPreview || dataToCsv(data));
+      showToast("CSV copiado al portapapeles");
+    } catch (error) {
+      console.error("Error copiando CSV:", error);
+      showToast("No se pudo copiar automáticamente", "warn");
+    }
   }
 
   function importCsv(event) {
@@ -692,11 +949,9 @@ export default function App() {
         )}
 
         {tab === "projects" && (
-          <div style={{ color: text, fontFamily: mono, textAlign: "center", padding: "4rem" }}>
-            <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>⬡</div>
-            <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Módulo de Proyectos</div>
-            <div style={{ color: muted, fontSize: "0.85rem" }}>Este módulo está conectado a Firebase. Implementaremos los detalles en la siguiente fase.</div>
-          </div>
+          <ProjectsView projects={projects || []} invData={data}
+            onCreateProject={createProject} onUpdateProject={updateProject}
+            onAddComponent={addComponentToProject} onRemoveComponent={removeComponentFromProject} onDeleteProject={deleteProject} />
         )}
       </div>
 
@@ -704,6 +959,19 @@ export default function App() {
         <div style={{ position: "fixed", bottom: "1.5rem", right: "1.5rem", background: toast.type === "warn" ? "#451a03" : "#052e16", border: `1px solid ${toast.type === "warn" ? "#92400e" : "#166534"}`, borderRadius: 9, padding: "0.65rem 1.1rem", color: toast.type === "warn" ? "#fcd34d" : "#86efac", fontSize: "0.75rem", fontFamily: mono, boxShadow: "0 8px 30px rgba(0,0,0,0.4)", animation: "slideIn 0.2s ease", zIndex: 2000 }}>
           {toast.type === "warn" ? "⚠ " : "✓ "}{toast.msg}
         </div>
+      )}
+
+      {csvPreview && (
+        <Modal title="CSV exportado" onClose={() => setCsvPreview(null)} width={760}>
+          <p style={{ color: textDim, fontSize: "0.78rem", lineHeight: 1.6, marginBottom: "0.9rem", fontFamily: mono }}>
+            Si el navegador no descargó el archivo, copia este respaldo y guárdalo como electroinventory.csv.
+          </p>
+          <textarea readOnly value={csvPreview} style={{ ...inp, minHeight: 260, resize: "vertical", lineHeight: 1.5, whiteSpace: "pre", overflow: "auto" }} />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "1rem" }}>
+            <button onClick={() => setCsvPreview(null)} className="hbtn" style={{ background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, padding: "0.55rem 0.9rem", color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>cerrar</button>
+            <button onClick={copyCsvPreview} className="hbtn" style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 7, padding: "0.55rem 0.9rem", color: "#86efac", cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>copiar CSV</button>
+          </div>
+        </Modal>
       )}
     </div>
   );
