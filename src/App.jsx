@@ -5,12 +5,12 @@ import { database, ref, set, update, remove, onValue, off } from "./firebase";
 const CAT_META = {
   "Circuitos Integrados": { color: "#f59e0b", icon: "◈" },
   "Transistores": { color: "#10b981", icon: "⊳" },
-  "Diodos": { color: "#ef4444", icon: "▷" },
+  "Diodos": { colxor: "#ef4444", icon: "▷" },
   "Resistencias": { color: "#f97316", icon: "⊟" },
   "Capacitores": { color: "#3b82f6", icon: "||" },
   "Inductores": { color: "#8b5cf6", icon: "∿" },
   "Cristales": { color: "#06b6d4", icon: "◇" },
-  "Módulos y Pantallas": { color: "#6366f1", icon: "⬡" },
+  "Modulos y Pantallas": { color: "#6366f1", icon: "⬡" },
   "Otros": { color: "#84cc16", icon: "⬢" },
 };
 function catMeta(name) {
@@ -49,7 +49,7 @@ const INITIAL_DATA = {
       {part:"7905",qty:1,spec:"-5V 1A TO-220"},{part:"7912",qty:0,spec:"-12V 1A TO-220"},
       {part:"LM317",qty:1,spec:"Adj. 1.2-37V TO-220"},{part:"178M05T",qty:1,spec:"+5V 500mA SOT-89"},
     ]},
-    "Moduladores / Demoduladores": { items: [{part:"MC1496P",qty:1,spec:"Balanced Modulator DIP-14"}]},
+    "Moduladores - Demoduladores": { items: [{part:"MC1496P",qty:1,spec:"Balanced Modulator DIP-14"}]},
     "Generales": { items: [{part:"LM3915",qty:1,spec:"Dot/Bar Display Driver"}]},
   }},
   "Transistores": { ...catMeta("Transistores"), subcats: {
@@ -135,8 +135,8 @@ const INITIAL_DATA = {
   "Cristales": { ...catMeta("Cristales"), subcats: {
     "Osciladores": { items: [{part:"4MHz",qty:3,spec:"HC-49S"},{part:"12MHz",qty:0,spec:"HC-49S"}]},
   }},
-  "Módulos y Pantallas": { ...catMeta("Módulos y Pantallas"), subcats: {
-    "Módulos": { items: [{part:"RC522",qty:0,spec:"RFID 13.56MHz SPI"}]},
+  "Modulos y Pantallas": { ...catMeta("Modulos y Pantallas"), subcats: {
+    "Modulos": { items: [{part:"RC522",qty:0,spec:"RFID 13.56MHz SPI"}]},
     "Pantallas": { items: [{part:"LCD2004",qty:1,spec:"20x4 HD44780 I2C"}]},
   }},
   "Otros": { ...catMeta("Otros"), subcats: {
@@ -211,29 +211,72 @@ function useFirebaseInventory(userId) {
 
   useEffect(() => {
     const inventoryRef = ref(database, `users/${userId}/inventory`);
-    
-    const unsubscribe = onValue(inventoryRef, (snapshot) => {
-      if (snapshot.exists()) {
-        // Clonar datos para garantizar inmutabilidad
-        const firebaseData = JSON.parse(JSON.stringify(snapshot.val()));
-        setData(firebaseData);
-      } else {
-        // Si no existe, crear con datos iniciales
-        set(inventoryRef, JSON.parse(JSON.stringify(INITIAL_DATA)));
-        setData(JSON.parse(JSON.stringify(INITIAL_DATA)));
-      }
-      setLoading(false);
-    }, (error) => {
-      console.error("Error Firebase:", error);
-      // Fallback a datos locales
-      setData(JSON.parse(JSON.stringify(INITIAL_DATA)));
-      setLoading(false);
-    });
+    let unsubscribe;
 
-    return () => off(inventoryRef, 'value', unsubscribe);
+    const setupListener = async () => {
+      try {
+        unsubscribe = onValue(inventoryRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const firebaseData = JSON.parse(JSON.stringify(snapshot.val()));
+            setData(firebaseData);
+          } else {
+            const initialData = JSON.parse(JSON.stringify(INITIAL_DATA));
+            set(inventoryRef, initialData);
+            setData(initialData);
+          }
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error("Error Firebase:", error);
+        setData(JSON.parse(JSON.stringify(INITIAL_DATA)));
+        setLoading(false);
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [userId]);
 
-  return { data, loading, setData };
+  return { data, loading };
+}
+
+function useFirebaseProjects(userId) {
+  const [projects, setProjects] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const projectsRef = ref(database, `users/${userId}/projects`);
+    let unsubscribe;
+
+    const setupListener = async () => {
+      try {
+        unsubscribe = onValue(projectsRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const firebaseProjects = JSON.parse(JSON.stringify(snapshot.val()));
+            setProjects(Array.isArray(firebaseProjects) ? firebaseProjects : Object.values(firebaseProjects || {}));
+          } else {
+            setProjects([]);
+          }
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error("Error Firebase:", error);
+        setProjects([]);
+        setLoading(false);
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [userId]);
+
+  return { projects, loading };
 }
 
 // Sincronizar proyectos con Firebase
