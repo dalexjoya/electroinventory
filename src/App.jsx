@@ -385,7 +385,7 @@ function csvToData(csvText, baseData = {}) {
 }
 
 // ─── CATEGORY PANEL ───────────────────────────────────────────────────────────
-function CatPanel({ catName, catObj, onUpdate, onRenameCat, expanded, onToggle }) {
+function CatPanel({ catName, catObj, onUpdate, onRenameCat, onDeleteCat, expanded, onToggle }) {
   const [openSub, setOpenSub] = useState(null);
   const [addTo, setAddTo] = useState(null);
   const [editItem, setEditItem] = useState(null);
@@ -398,6 +398,7 @@ function CatPanel({ catName, catObj, onUpdate, onRenameCat, expanded, onToggle }
   const [editCatName, setEditCatName] = useState(false);
   const [newCatName, setNewCatName] = useState(catName);
   const [catNameError, setCatNameError] = useState("");
+  const [delCatConfirm, setDelCatConfirm] = useState(false);
   const color = catObj.color;
   const LOW = 2;
 
@@ -499,7 +500,7 @@ function CatPanel({ catName, catObj, onUpdate, onRenameCat, expanded, onToggle }
           <span style={{ color: muted, fontSize: "0.7rem", fontFamily: mono }}>{totalItems} refs</span>
           <span style={{ color, fontSize: "0.75rem", fontFamily: mono, fontWeight: 600 }}>{totalQty} uds</span>
           {lowCount > 0 && <span style={{ background: "#7f1d1d", color: "#fca5a5", fontSize: "0.65rem", borderRadius: 10, padding: "0.1rem 0.45rem", fontFamily: mono, fontWeight: 700 }}>▲{lowCount}</span>}
-          {expanded && <button onClick={(e) => { e.stopPropagation(); setEditCatName(true); setNewCatName(catName); }} className="hbtn" style={{ background: "transparent", border: "none", color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", padding: "0.2rem 0.4rem" }}>✎</button>}
+          {expanded && <button onClick={(e) => { e.stopPropagation(); setEditCatName(true); setNewCatName(catName); }} className="hbtn" style={{ background: "transparent", border: "none", color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.95rem", padding: "0.2rem 0.4rem" }}>✎</button>}
           <span style={{ color: muted, fontSize: "0.75rem", transform: expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s", display: "inline-block", fontFamily: mono }}>▶</span>
         </div>
       </button>
@@ -528,9 +529,29 @@ function CatPanel({ catName, catObj, onUpdate, onRenameCat, expanded, onToggle }
             </div>
             {catNameError && <div style={{ color: "#f87171", fontSize: "0.72rem", fontFamily: mono }}>{catNameError}</div>}
           </div>
-          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
-            <button onClick={() => { setEditCatName(false); setCatNameError(""); }} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cancelar</button>
-            <button onClick={handleRenameCat} className="hbtn" style={{ padding: "0.55rem 1.2rem", background: color + "22", border: `1px solid ${color}44`, borderRadius: 7, color, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>Renombrar</button>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "space-between" }}>
+            <button onClick={() => setDelCatConfirm(true)} className="hbtn" style={{ padding: "0.55rem 1rem", background: "#7f1d1d", border: "1px solid #b91c1c", borderRadius: 7, color: "#fca5a5", cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>🗑 Eliminar categoría</button>
+            <div style={{ display: "flex", gap: "0.4rem" }}>
+              <button onClick={() => { setEditCatName(false); setCatNameError(""); }} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cancelar</button>
+              <button onClick={handleRenameCat} className="hbtn" style={{ padding: "0.55rem 1.2rem", background: color + "22", border: `1px solid ${color}44`, borderRadius: 7, color, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>Renombrar</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {delCatConfirm && (
+        <Modal title="// CONFIRMAR ELIMINACIÓN" onClose={() => setDelCatConfirm(false)} width={420}>
+          <div style={{ display: "grid", gap: "1rem" }}>
+            <div style={{ color: textDim, fontSize: "0.85rem", lineHeight: 1.6, fontFamily: mono }}>
+              ¿Estás seguro que deseas eliminar la categoría <span style={{ color: "#f87171", fontWeight: 700 }}>"{catName}"</span>?
+            </div>
+            <div style={{ background: "#1c0a0a", border: "1px solid #7f1d1d", borderRadius: 8, padding: "0.75rem 1rem", color: "#fca5a5", fontSize: "0.75rem", fontFamily: mono }}>
+              ⚠ Se eliminarán todos los componentes de esta categoría. Esta acción no se puede deshacer.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem", justifyContent: "flex-end" }}>
+            <button onClick={() => setDelCatConfirm(false)} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cancelar</button>
+            <button onClick={() => { onDeleteCat(); setDelCatConfirm(false); setEditCatName(false); }} className="hbtn" style={{ padding: "0.55rem 1.2rem", background: "#7f1d1d", border: "1px solid #b91c1c", borderRadius: 7, color: "#fca5a5", cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>Sí, eliminar</button>
           </div>
         </Modal>
       )}
@@ -971,6 +992,23 @@ export default function App() {
     showToast(`Categoría renombrada a "${newName}"`);
   }
 
+  function deleteCat(catName) {
+    if (!data) return;
+    const newData = clone(data);
+    delete newData[catName];
+    
+    // Remove from expanded state
+    setExpanded(e => {
+      const newExp = { ...e };
+      delete newExp[catName];
+      return newExp;
+    });
+    
+    setData(newData);
+    saveInventoryToFirebase(userId, newData);
+    showToast(`Categoría "${catName}" eliminada`);
+  }
+
   function updateProjects(newProjects) {
     saveProjectsToFirebase(userId, newProjects);
   }
@@ -1187,7 +1225,7 @@ export default function App() {
                 </div>
                 {Object.entries(data).map(([catName, catObj]) => (
                   <CatPanel key={catName} catName={catName} catObj={catObj} expanded={!!expanded[catName]}
-                    onToggle={() => setExpanded(e => ({ ...e, [catName]: !e[catName] }))} onUpdate={next => updateCat(catName, next)} onRenameCat={(newName) => renameCat(catName, newName)} />
+                    onToggle={() => setExpanded(e => ({ ...e, [catName]: !e[catName] }))} onUpdate={next => updateCat(catName, next)} onRenameCat={(newName) => renameCat(catName, newName)} onDeleteCat={() => deleteCat(catName)} />
                 ))}
               </div>
             )}
