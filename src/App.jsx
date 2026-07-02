@@ -460,6 +460,7 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
 
   function handleAddSubcat() {
     const name = newSubcatName.trim();
+    console.log("handleAddSubcat called with name:", name);
     if (!name) {
       setSubcatError("Ingresa un nombre para la subcategoría");
       return;
@@ -468,6 +469,7 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
       setSubcatError("Esa subcategoría ya existe");
       return;
     }
+    console.log("Adding subcat:", name);
     addSubcatFn(name);
   }
 
@@ -882,6 +884,11 @@ export default function App() {
   }
 
   function updateCat(catName, next) {
+    if (!data) {
+      console.error("No data available for update");
+      showToast("Error: No hay datos disponibles", "warn");
+      return;
+    }
     const newData = clone(data);
     newData[catName] = next;
     setData(newData);
