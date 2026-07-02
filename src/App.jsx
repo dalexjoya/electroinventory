@@ -240,7 +240,7 @@ function useFirebaseInventory(userId) {
     };
   }, [userId]);
 
-  return { data, loading };
+  return { data, setData, loading };
 }
 
 // Sincronizar proyectos con Firebase
@@ -460,7 +460,6 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
 
   function handleAddSubcat() {
     const name = newSubcatName.trim();
-    console.log("handleAddSubcat called with name:", name);
     if (!name) {
       setSubcatError("Ingresa un nombre para la subcategoría");
       return;
@@ -469,7 +468,6 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
       setSubcatError("Esa subcategoría ya existe");
       return;
     }
-    console.log("Adding subcat:", name);
     addSubcatFn(name);
   }
 
@@ -868,7 +866,7 @@ function ProjectsView({ projects, invData, onCreateProject, onUpdateProject, onA
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const userId = "user_default"; // En futuro: usar autenticación real
-  const { data, loading: dataLoading } = useFirebaseInventory(userId);
+  const { data, setData, loading: dataLoading } = useFirebaseInventory(userId);
   const { projects, loading: projectsLoading } = useFirebaseProjects(userId);
   
   const [tab, setTab] = useState("inventory");
@@ -884,11 +882,6 @@ export default function App() {
   }
 
   function updateCat(catName, next) {
-    if (!data) {
-      console.error("No data available for update");
-      showToast("Error: No hay datos disponibles", "warn");
-      return;
-    }
     const newData = clone(data);
     newData[catName] = next;
     setData(newData);
