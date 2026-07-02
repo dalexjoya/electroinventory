@@ -393,6 +393,8 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
   const [addSubcat, setAddSubcat] = useState(false);
   const [newSubcatName, setNewSubcatName] = useState("");
   const [subcatError, setSubcatError] = useState("");
+  const [newItem, setNewItem] = useState({ part: "", spec: "", qty: 1 });
+  const [itemError, setItemError] = useState("");
   const color = catObj.color;
   const LOW = 2;
 
@@ -420,6 +422,24 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
     next.subcats[sub].items.push(item);
     onUpdate(next);
     setAddTo(null);
+    setNewItem({ part: "", spec: "", qty: 1 });
+    setItemError("");
+  }
+
+  function handleAddItem() {
+    const part = newItem.part.trim();
+    if (!part) {
+      setItemError("Ingresa la referencia del componente");
+      return;
+    }
+    const sub = addTo;
+    if (!sub) return;
+    const existing = catObj.subcats[sub]?.items?.some(item => item.part.toLowerCase() === part.toLowerCase());
+    if (existing) {
+      setItemError("Ese componente ya existe en esta subcategoría");
+      return;
+    }
+    addItem(sub, { part, qty: Number(newItem.qty) || 0, spec: newItem.spec.trim() });
   }
 
   function delItemFn(sub, part) {
@@ -472,7 +492,7 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
                 <span style={{ color, fontSize: "0.65rem" }}>◆</span>
                 <span style={{ color: textDim, fontFamily: mono, fontSize: "0.78rem", fontWeight: 600, flex: 1, letterSpacing: "0.04em" }}>{subName}</span>
                 <span style={{ color: muted, fontSize: "0.65rem", fontFamily: mono }}>{(subObj.items || []).length} refs · {(subObj.items || []).reduce((s, i) => s + i.qty, 0)} uds</span>
-                <button onClick={e => { e.stopPropagation(); setAddTo(subName); }} className="hbtn"
+                <button onClick={e => { e.stopPropagation(); setAddTo(subName); setNewItem({ part: "", spec: "", qty: 1 }); setItemError(""); }} className="hbtn"
                   style={{ background: color + "22", border: `1px solid ${color}44`, borderRadius: 5, padding: "0.15rem 0.45rem", color, cursor: "pointer", fontFamily: mono, fontSize: "0.65rem", fontWeight: 700 }}>+ agregar</button>
                 <span style={{ color: muted, fontSize: "0.7rem", fontFamily: mono, transform: openSub === subName ? "rotate(90deg)" : "", transition: "transform 0.15s", display: "inline-block", marginLeft: "0.25rem" }}>▶</span>
               </div>
@@ -480,7 +500,7 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
                 <div style={{ animation: "fadeUp 0.12s ease" }}>
                   {(!subObj.items || subObj.items.length === 0) ? (
                     <div style={{ padding: "1.5rem", textAlign: "center", color: muted, fontSize: "0.75rem", fontFamily: mono }}>
-                      Sin componentes — <button onClick={() => setAddTo(subName)} style={{ background: "none", border: "none", color, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", textDecoration: "underline" }}>agregar primero</button>
+                      Sin componentes — <button onClick={() => { setAddTo(subName); setNewItem({ part: "", spec: "", qty: 1 }); setItemError(""); }} style={{ background: "none", border: "none", color, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", textDecoration: "underline" }}>agregar primero</button>
                     </div>
                   ) : (
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -547,7 +567,46 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
           </div>
         </div>
       )}
-      {/* Modals aquí - los omito por espacio, son iguales que antes */}
+      {addTo && (
+        <Modal title={`// NUEVO COMPONENTE · ${addTo}`} onClose={() => { setAddTo(null); setNewItem({ part: "", spec: "", qty: 1 }); setItemError(""); }} width={460}>
+          <div style={{ display: "grid", gap: "0.9rem" }}>
+            <div>
+              <label style={lbl}>Referencia *</label>
+              <input
+                autoFocus
+                value={newItem.part}
+                onChange={event => { setNewItem(item => ({ ...item, part: event.target.value })); if (itemError) setItemError(""); }}
+                placeholder="ej: LED Rojo"
+                style={inp}
+              />
+            </div>
+            <div>
+              <label style={lbl}>Especificación</label>
+              <input
+                value={newItem.spec}
+                onChange={event => setNewItem(item => ({ ...item, spec: event.target.value }))}
+                placeholder="ej: 5mm 2V 20mA"
+                style={inp}
+              />
+            </div>
+            <div>
+              <label style={lbl}>Cantidad</label>
+              <input
+                type="number"
+                min="0"
+                value={newItem.qty}
+                onChange={event => setNewItem(item => ({ ...item, qty: Number(event.target.value) || 0 }))}
+                style={inp}
+              />
+            </div>
+            {itemError && <div style={{ color: "#f87171", fontSize: "0.72rem", fontFamily: mono }}>{itemError}</div>}
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
+            <button onClick={() => { setAddTo(null); setNewItem({ part: "", spec: "", qty: 1 }); setItemError(""); }} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cancelar</button>
+            <button onClick={handleAddItem} className="hbtn" style={{ padding: "0.55rem 1.2rem", background: color + "22", border: `1px solid ${color}44`, borderRadius: 7, color, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>Guardar</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
