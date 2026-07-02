@@ -884,6 +884,7 @@ export default function App() {
   function updateCat(catName, next) {
     const newData = clone(data);
     newData[catName] = next;
+    setData(newData);
     saveInventoryToFirebase(userId, newData);
     showToast("Guardado en Firebase");
   }
