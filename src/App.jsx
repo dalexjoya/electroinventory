@@ -275,7 +275,7 @@ function useFirebaseProjects(userId) {
 function saveInventoryToFirebase(userId, data) {
   const inventoryRef = ref(database, `users/${userId}/inventory`);
   const cleanData = JSON.parse(JSON.stringify(data));
-  update(inventoryRef, cleanData).catch(err => console.error("Error guardando inventario:", err));
+  set(inventoryRef, cleanData).catch(err => console.error("Error guardando inventario:", err));
 }
 
 // Guardar proyectos en Firebase
