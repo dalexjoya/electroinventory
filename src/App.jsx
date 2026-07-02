@@ -385,7 +385,7 @@ function csvToData(csvText, baseData = {}) {
 }
 
 // ─── CATEGORY PANEL ───────────────────────────────────────────────────────────
-function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
+function CatPanel({ catName, catObj, onUpdate, onRenameCat, expanded, onToggle }) {
   const [openSub, setOpenSub] = useState(null);
   const [addTo, setAddTo] = useState(null);
   const [editItem, setEditItem] = useState(null);
@@ -395,6 +395,9 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
   const [subcatError, setSubcatError] = useState("");
   const [newItem, setNewItem] = useState({ part: "", spec: "", qty: 1 });
   const [itemError, setItemError] = useState("");
+  const [editCatName, setEditCatName] = useState(false);
+  const [newCatName, setNewCatName] = useState(catName);
+  const [catNameError, setCatNameError] = useState("");
   const color = catObj.color;
   const LOW = 2;
 
@@ -407,6 +410,22 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
     const item = next.subcats[sub].items.find(i => i.part === part);
     if (item) item.qty = Math.max(0, item.qty + delta);
     onUpdate(next);
+  }
+
+  function handleRenameCat() {
+    const name = newCatName.trim();
+    if (!name) {
+      setCatNameError("El nombre no puede estar vacío");
+      return;
+    }
+    if (name === catName) {
+      setEditCatName(false);
+      setCatNameError("");
+      return;
+    }
+    onRenameCat(name);
+    setEditCatName(false);
+    setCatNameError("");
   }
 
   function saveEdit(sub, upd) {
@@ -480,9 +499,41 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
           <span style={{ color: muted, fontSize: "0.7rem", fontFamily: mono }}>{totalItems} refs</span>
           <span style={{ color, fontSize: "0.75rem", fontFamily: mono, fontWeight: 600 }}>{totalQty} uds</span>
           {lowCount > 0 && <span style={{ background: "#7f1d1d", color: "#fca5a5", fontSize: "0.65rem", borderRadius: 10, padding: "0.1rem 0.45rem", fontFamily: mono, fontWeight: 700 }}>▲{lowCount}</span>}
+          {expanded && <button onClick={(e) => { e.stopPropagation(); setEditCatName(true); setNewCatName(catName); }} className="hbtn" style={{ background: "transparent", border: "none", color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", padding: "0.2rem 0.4rem" }}>✎</button>}
           <span style={{ color: muted, fontSize: "0.75rem", transform: expanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s", display: "inline-block", fontFamily: mono }}>▶</span>
         </div>
       </button>
+      {editCatName && (
+        <Modal title="// RENOMBRAR CATEGORÍA" onClose={() => { setEditCatName(false); setCatNameError(""); }} width={420}>
+          <div style={{ display: "grid", gap: "0.9rem" }}>
+            <div>
+              <label style={lbl}>Nuevo nombre de categoría</label>
+              <input
+                autoFocus
+                value={newCatName}
+                onChange={event => { setNewCatName(event.target.value); if (catNameError) setCatNameError(""); }}
+                onKeyDown={event => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleRenameCat();
+                  }
+                  if (event.key === "Escape") {
+                    setEditCatName(false);
+                    setCatNameError("");
+                  }
+                }}
+                placeholder="ej: Transistores y Tiristores"
+                style={inp}
+              />
+            </div>
+            {catNameError && <div style={{ color: "#f87171", fontSize: "0.72rem", fontFamily: mono }}>{catNameError}</div>}
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
+            <button onClick={() => { setEditCatName(false); setCatNameError(""); }} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cancelar</button>
+            <button onClick={handleRenameCat} className="hbtn" style={{ padding: "0.55rem 1.2rem", background: color + "22", border: `1px solid ${color}44`, borderRadius: 7, color, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>Renombrar</button>
+          </div>
+        </Modal>
+      )}
       {expanded && (
         <div style={{ borderTop: `1px solid ${bord}`, animation: "fadeUp 0.15s ease" }}>
           {Object.entries(catObj.subcats).map(([subName, subObj]) => (
@@ -889,6 +940,37 @@ export default function App() {
     showToast("Guardado en Firebase");
   }
 
+  function renameCat(oldName, newName) {
+    if (!data) return;
+    const newData = clone(data);
+    const catObj = newData[oldName];
+    if (!catObj) return;
+    
+    // Check if new name already exists
+    if (newData[newName] && newName !== oldName) {
+      showToast("Esa categoría ya existe", "warn");
+      return;
+    }
+    
+    // Rename the category
+    newData[newName] = catObj;
+    delete newData[oldName];
+    
+    // Update expanded state to use new name
+    setExpanded(e => {
+      const newExp = { ...e };
+      if (newExp[oldName]) {
+        newExp[newName] = true;
+        delete newExp[oldName];
+      }
+      return newExp;
+    });
+    
+    setData(newData);
+    saveInventoryToFirebase(userId, newData);
+    showToast(`Categoría renombrada a "${newName}"`);
+  }
+
   function updateProjects(newProjects) {
     saveProjectsToFirebase(userId, newProjects);
   }
@@ -1105,7 +1187,7 @@ export default function App() {
                 </div>
                 {Object.entries(data).map(([catName, catObj]) => (
                   <CatPanel key={catName} catName={catName} catObj={catObj} expanded={!!expanded[catName]}
-                    onToggle={() => setExpanded(e => ({ ...e, [catName]: !e[catName] }))} onUpdate={next => updateCat(catName, next)} />
+                    onToggle={() => setExpanded(e => ({ ...e, [catName]: !e[catName] }))} onUpdate={next => updateCat(catName, next)} onRenameCat={(newName) => renameCat(catName, newName)} />
                 ))}
               </div>
             )}
