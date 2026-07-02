@@ -4,7 +4,7 @@ import { database, ref, set, update, remove, onValue, off } from "./firebase";
 // ─── CATEGORY META ───────────────────────────────────────────────────────────
 const CAT_META = {
   "Circuitos Integrados": { color: "#f59e0b", icon: "◈" },
-  "Transistores": { color: "#10b981", icon: "⊳" },
+  "Transistores y Tiristores": { color: "#10b981", icon: "⊳" },
   "Diodos": { colxor: "#ef4444", icon: "▷" },
   "Resistencias": { color: "#f97316", icon: "⊟" },
   "Capacitores": { color: "#3b82f6", icon: "||" },
@@ -52,7 +52,7 @@ const INITIAL_DATA = {
     "Moduladores - Demoduladores": { items: [{part:"MC1496P",qty:1,spec:"Balanced Modulator DIP-14"}]},
     "Generales": { items: [{part:"LM3915",qty:1,spec:"Dot/Bar Display Driver"}]},
   }},
-  "Transistores": { ...catMeta("Transistores"), subcats: {
+  "Transistores y Tiristores": { ...catMeta("Transistores y Tiristores"), subcats: {
     "BJT PNP": { items: [
       {part:"A1015",qty:20,spec:"PNP 150mA 50V TO-92"},{part:"BC327",qty:17,spec:"PNP 800mA 45V TO-92"},
       {part:"BC517",qty:20,spec:"PNP Darlington TO-92"},{part:"BC547",qty:18,spec:"NPN 100mA 45V TO-92"},
