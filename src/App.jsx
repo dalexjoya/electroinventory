@@ -607,6 +607,61 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
           </div>
         </Modal>
       )}
+
+      {editItem && (
+        <Modal title={`// EDITAR COMPONENTE · ${editItem.item.part}`} onClose={() => setEditItem(null)} width={460}>
+          <div style={{ display: "grid", gap: "0.9rem" }}>
+            <div>
+              <label style={lbl}>Referencia</label>
+              <input
+                value={editItem.item.part}
+                disabled
+                style={{ ...inp, opacity: 0.6, cursor: "not-allowed" }}
+              />
+            </div>
+            <div>
+              <label style={lbl}>Especificación</label>
+              <input
+                value={editItem.item.spec || ""}
+                onChange={event => setEditItem(item => ({ ...item, item: { ...item.item, spec: event.target.value } }))}
+                placeholder="ej: 5mm 2V 20mA"
+                style={inp}
+              />
+            </div>
+            <div>
+              <label style={lbl}>Cantidad</label>
+              <input
+                type="number"
+                min="0"
+                value={editItem.item.qty}
+                onChange={event => setEditItem(item => ({ ...item, item: { ...item.item, qty: Number(event.target.value) || 0 } }))}
+                style={inp}
+              />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", justifyContent: "flex-end" }}>
+            <button onClick={() => setEditItem(null)} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cancelar</button>
+            <button onClick={() => { saveEdit(editItem.subName, editItem.item); }} className="hbtn" style={{ padding: "0.55rem 1.2rem", background: "#0f2749", border: "1px solid #1d4ed8", borderRadius: 7, color: "#60a5fa", cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>Guardar cambios</button>
+          </div>
+        </Modal>
+      )}
+
+      {delItem && (
+        <Modal title="// CONFIRMAR ELIMINACIÓN" onClose={() => setDelItem(null)} width={420}>
+          <div style={{ display: "grid", gap: "1rem" }}>
+            <div style={{ color: textDim, fontSize: "0.85rem", lineHeight: 1.6, fontFamily: mono }}>
+              ¿Estás seguro que deseas eliminar el componente <span style={{ color: "#f87171", fontWeight: 700 }}>"{delItem.item.part}"</span> de la subcategoría <span style={{ color, fontWeight: 700 }}>"{delItem.subName}"</span>?
+            </div>
+            <div style={{ background: "#1c0a0a", border: "1px solid #7f1d1d", borderRadius: 8, padding: "0.75rem 1rem", color: "#fca5a5", fontSize: "0.75rem", fontFamily: mono }}>
+              ⚠ Esta acción no se puede deshacer
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem", justifyContent: "flex-end" }}>
+            <button onClick={() => setDelItem(null)} className="hbtn" style={{ padding: "0.55rem 1rem", background: "transparent", border: `1px solid ${bord2}`, borderRadius: 7, color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.75rem" }}>Cancelar</button>
+            <button onClick={() => { delItemFn(delItem.subName, delItem.item.part); }} className="hbtn" style={{ padding: "0.55rem 1.2rem", background: "#7f1d1d", border: "1px solid #b91c1c", borderRadius: 7, color: "#fca5a5", cursor: "pointer", fontFamily: mono, fontSize: "0.75rem", fontWeight: 700 }}>Sí, eliminar</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
