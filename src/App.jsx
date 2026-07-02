@@ -391,6 +391,8 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
   const [editItem, setEditItem] = useState(null);
   const [delItem, setDelItem] = useState(null);
   const [addSubcat, setAddSubcat] = useState(false);
+  const [newSubcatName, setNewSubcatName] = useState("");
+  const [subcatError, setSubcatError] = useState("");
   const color = catObj.color;
   const LOW = 2;
 
@@ -432,6 +434,21 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
     next.subcats[name] = { items: [] };
     onUpdate(next);
     setAddSubcat(false);
+    setNewSubcatName("");
+    setSubcatError("");
+  }
+
+  function handleAddSubcat() {
+    const name = newSubcatName.trim();
+    if (!name) {
+      setSubcatError("Ingresa un nombre para la subcategoría");
+      return;
+    }
+    if (catObj.subcats[name]) {
+      setSubcatError("Esa subcategoría ya existe");
+      return;
+    }
+    addSubcatFn(name);
   }
 
   return (
@@ -494,7 +511,39 @@ function CatPanel({ catName, catObj, onUpdate, expanded, onToggle }) {
             </div>
           ))}
           <div style={{ padding: "0.6rem 1.125rem", background: "#060d1a", display: "flex", justifyContent: "flex-end" }}>
-            <button onClick={() => setAddSubcat(true)} className="hbtn" style={{ background: "transparent", border: `1px dashed ${bord2}`, borderRadius: 5, padding: "0.3rem 0.75rem", color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.65rem" }}>+ nueva subcategoría</button>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.4rem", width: "100%" }}>
+              <button onClick={() => { setAddSubcat(true); setNewSubcatName(""); setSubcatError(""); }} className="hbtn" style={{ background: "transparent", border: `1px dashed ${bord2}`, borderRadius: 5, padding: "0.3rem 0.75rem", color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.65rem" }}>+ nueva subcategoría</button>
+              {addSubcat && (
+                <div style={{ width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                  <input
+                    autoFocus
+                    value={newSubcatName}
+                    onChange={event => {
+                      setNewSubcatName(event.target.value);
+                      if (subcatError) setSubcatError("");
+                    }}
+                    onKeyDown={event => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleAddSubcat();
+                      }
+                      if (event.key === "Escape") {
+                        setAddSubcat(false);
+                        setNewSubcatName("");
+                        setSubcatError("");
+                      }
+                    }}
+                    placeholder="Nombre de la subcategoría"
+                    style={{ background: "#0b1220", border: `1px solid ${bord}`, borderRadius: 5, color: text, padding: "0.35rem 0.55rem", fontFamily: mono, fontSize: "0.72rem" }}
+                  />
+                  {subcatError && <span style={{ color: "#f87171", fontSize: "0.68rem", fontFamily: mono }}>{subcatError}</span>}
+                  <div style={{ display: "flex", gap: "0.4rem" }}>
+                    <button onClick={handleAddSubcat} className="hbtn" style={{ background: color + "22", border: `1px solid ${color}44`, borderRadius: 5, padding: "0.25rem 0.55rem", color, cursor: "pointer", fontFamily: mono, fontSize: "0.68rem", fontWeight: 700 }}>guardar</button>
+                    <button onClick={() => { setAddSubcat(false); setNewSubcatName(""); setSubcatError(""); }} className="hbtn" style={{ background: "transparent", border: `1px solid ${bord}`, borderRadius: 5, padding: "0.25rem 0.55rem", color: muted, cursor: "pointer", fontFamily: mono, fontSize: "0.68rem" }}>cancelar</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
